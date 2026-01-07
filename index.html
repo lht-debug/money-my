@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>财务管家 </title>
+    <title>财务管家 (修复版)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -75,8 +75,7 @@
             position: relative; 
         }
         .card-title { font-size: 16px; font-weight: bold; margin: 0 0 12px 0; color: #333; display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap;}
-        .card-title span { white-space: nowrap; flex-shrink: 0; margin-right: 10px; }
-
+        
         /* 筛选栏 */
         .chart-filter-bar {
             background: #f8f9fa; padding: 10px; border-radius: 12px; margin-bottom: 15px;
@@ -149,15 +148,18 @@
         .btn-recover { background: #f3e5f5; color: #9c27b0; }
         .btn-excel { background: #e8f5e9; color: #4caf50; }
         
-        /* === 📭 空状态 === */
+        /* === 📭 空状态 (图表修复) === */
+        /* 强制覆盖画布，居中显示 */
         .chart-empty-state {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(255,255,255,0.95); z-index: 10; color: #ccc; 
+            background: #ffffff; /* 不透明背景 */
+            z-index: 100; /* 高层级 */
+            color: #999; 
         }
         .list-empty-state { padding: 40px 0; text-align: center; color: #bbb; font-size: 14px; }
         .empty-icon { font-size: 48px; margin-bottom: 10px; opacity: 0.6; }
-        .empty-text { font-size: 14px; }
+        .empty-text { font-size: 14px; font-weight: 500;}
 
         /* === 🎬 动画层 === */
         #anim-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 11000; overflow: hidden; display: none;}
@@ -192,7 +194,7 @@
         .list-filter-bar input { flex: 2; padding: 8px; font-size: 13px; border-radius: 8px; }
         .list-filter-bar select { flex: 1; padding: 8px; font-size: 13px; border-radius: 8px; }
 
-        /* === 🧭 聚光灯指引系统 === */
+        /* === 🧭 聚光灯指引系统 (样式修复) === */
         #spotlight-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 9990; display: none;
@@ -206,19 +208,29 @@
             pointer-events: none;
         }
 
+        /* 指引文字框 - 绝对定位固定 */
         .guide-tooltip {
-            position: absolute; width: 280px; background: #fff; padding: 20px;
+            position: fixed; /* 改为fixed，防止被挤压 */
+            left: 50%; transform: translateX(-50%);
+            width: 85%; max-width: 300px;
+            background: #fff; padding: 20px;
             border-radius: 16px; text-align: center;
-            /* 双重高亮：文字框也发光 */
+            /* 双重高亮 */
             box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.6);
             z-index: 10002; opacity: 0;
-            transition: opacity 0.3s, transform 0.4s; pointer-events: auto;
+            transition: opacity 0.3s, bottom 0.4s, top 0.4s; 
+            pointer-events: auto;
         }
         .guide-tooltip.show { opacity: 1; }
         
+        /* 强制定位类 */
+        .guide-tooltip.bottom-mode { top: auto; bottom: 120px; }
+        .guide-tooltip.top-mode { bottom: auto; top: 80px; }
+        .guide-tooltip.center-mode { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
+
         .guide-lion { font-size: 40px; position: absolute; top: -25px; left: 50%; transform: translateX(-50%); background:#fff; border-radius:50%; width:50px; height:50px; line-height:50px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .guide-title { font-size: 16px; font-weight: bold; margin-top: 15px; margin-bottom: 8px; color: var(--primary); }
-        .guide-text { font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.5; }
+        .guide-text { font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.5; white-space: pre-wrap;}
         .guide-btn-row { display: flex; gap: 10px; justify-content: center; }
         .guide-btn { border: none; padding: 8px 20px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; }
         .btn-skip { background: #f0f0f0; color: #999; }
@@ -226,7 +238,6 @@
 
         .guide-highlight {
             position: relative; z-index: 10000 !important;
-            /* 双重高亮：目标也发光 */
             box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.6), 0 0 0 9999px rgba(0,0,0,0.75) !important;
             transition: all 0.3s;
             background-color: var(--card-bg);
@@ -340,7 +351,7 @@
 
 <div id="spotlight-overlay">
     <div class="spotlight-box" id="spotlight-box"></div>
-    <div class="guide-tooltip" id="guide-tooltip">
+    <div class="guide-tooltip center-mode" id="guide-tooltip">
         <div class="guide-lion">🦁</div>
         <div class="guide-title" id="guide-title">Title</div>
         <div class="guide-text" id="guide-text">Text</div>
@@ -374,7 +385,7 @@
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
     let currentBudget = parseFloat(localStorage.getItem('monthlyBudget')) || 0;
 
-    // === 🦁 聚光灯指引逻辑 ===
+    // === 🦁 聚光灯指引逻辑 (修复样式版) ===
     let guideStep = 0;
     const guideData = [
         { id: 'start', title: "欢迎新朋友！", text: "我是你的财务小狮子。\n花 1 分钟带你熟悉一下新家吧！", target: null },
@@ -384,6 +395,9 @@
         { id: 'backup', title: "💾 数据防丢", text: "重要！这是单机网页版。\n清缓存或换手机前，务必点【下载备份】！", target: 'target-backup' },
         { id: 'nav', title: "🧭 随时切换", text: "底部导航栏随时切换页面。\n好了，开始你的财富自由之旅吧！🚀", target: 'target-nav' }
     ];
+
+    // 测试专用：强制开启指引 (发布请注释)
+    // localStorage.removeItem('hasSeenGuide'); 
 
     function checkGuide() {
         if (!localStorage.getItem('hasSeenGuide')) setTimeout(startGuide, 500);
@@ -428,6 +442,9 @@
         if (step.id === 'backup') switchView('settings');
 
         setTimeout(() => {
+            // 先移除之前的定位类
+            tooltip.classList.remove('bottom-mode', 'top-mode', 'center-mode');
+
             if (step.target) {
                 const targetEl = document.getElementById(step.target);
                 if(targetEl) {
@@ -439,22 +456,26 @@
                     spotBox.style.borderRadius = getComputedStyle(targetEl).borderRadius;
                     spotBox.style.opacity = 1;
 
+                    // 简单粗暴的定位逻辑 (三段式)
                     const screenH = window.innerHeight;
-                    const spaceBelow = screenH - rect.bottom;
-                    let toolTop = '50%'; let toolTransform = 'translate(-50%, -50%)';
-                    
-                    if (spaceBelow > 200) { toolTop = (rect.bottom + 20) + 'px'; toolTransform = 'translateX(-50%)'; } 
-                    else if (rect.top > 200) { toolTop = (rect.top - 200) + 'px'; toolTransform = 'translateX(-50%)'; }
+                    const elCenterY = rect.top + rect.height / 2;
 
-                    tooltip.style.top = toolTop;
-                    tooltip.style.left = '50%';
-                    tooltip.style.transform = toolTransform;
+                    if (elCenterY < screenH / 3) {
+                        // 目标在顶部 -> 框放底部
+                        tooltip.classList.add('bottom-mode');
+                    } else if (elCenterY > screenH * 2 / 3) {
+                        // 目标在底部 -> 框放顶部 (如底部导航)
+                        tooltip.classList.add('center-mode'); // 底部导航特殊处理，放中间更好看
+                    } else {
+                        // 目标在中间 -> 框放顶部
+                        tooltip.classList.add('top-mode');
+                    }
                     tooltip.classList.add('show');
                 }
             } else {
+                // 欢迎页
                 spotBox.style.opacity = 0; spotBox.style.top = '-1000px'; 
-                tooltip.style.top = '50%'; tooltip.style.left = '50%';
-                tooltip.style.transform = 'translate(-50%, -50%)';
+                tooltip.classList.add('center-mode');
                 tooltip.classList.add('show');
             }
         }, 150);
@@ -556,8 +577,6 @@
 
         const typeSelect = document.getElementById('type');
         const catSelect = document.getElementById('category');
-        
-        // 核心修正：使用用户输入的备注，如果为空则存为空字符串 (不再默认为分类名)
         const userNote = document.getElementById('text').value.trim();
         
         const t = {
@@ -565,7 +584,7 @@
             amount: parseFloat(amtInput.value),
             type: typeSelect.value, category: catSelect.value,
             icon: catSelect.options[catSelect.selectedIndex]?.dataset.icon || '📝',
-            text: userNote // 存纯净的备注
+            text: userNote
         };
         transactions.push(t);
         localStorage.setItem('transactions', JSON.stringify(transactions));
@@ -591,7 +610,6 @@
         else if(t.type === 'expense') { colorClass = 'var(--danger)'; sign='-'; }
         else if(t.type.startsWith('debt')) { colorClass = 'var(--warning)'; }
         
-        // 显示逻辑：如果备注为空，显示分类名；否则显示备注
         const displayTitle = t.text || t.category;
         
         return `<li class="trans-item"><div class="t-left"><div class="t-icon">${t.icon}</div><div class="t-info"><h4>${displayTitle}</h4><span>${t.date} · ${t.category}</span></div></div><div class="t-left"><span class="t-amount" style="color:${colorClass}">${sign}¥${t.amount.toFixed(2)}</span><button class="del-btn" onclick="delItem(${t.id})">×</button></div></li>`;
@@ -636,7 +654,6 @@
         }
     }
 
-    // === 图表筛选 ===
     function getFilteredData() {
         const s = document.getElementById('start-date').value;
         const e = document.getElementById('end-date').value;
@@ -660,7 +677,6 @@
         const listEl = document.getElementById('full-list');
         const data = getFilteredData(); 
         const filtered = data.filter(t => {
-            // 搜索兼容：如果 text 为空，搜空字符串
             const searchText = t.text || "";
             const matchKey = searchText.toLowerCase().includes(keyword) || t.category.includes(keyword);
             let matchType = true;
@@ -686,12 +702,14 @@
     function updateAllCharts() {
         const data = getFilteredData();
         const emptyState = document.getElementById('chart-empty-state');
-        if (data.length === 0) {
+        
+        // 修复：强制判断
+        if (!data || data.length === 0) {
             emptyState.style.display = 'flex';
-            document.querySelectorAll('canvas').forEach(c => c.style.display = 'none');
+            document.querySelectorAll('canvas').forEach(c => c.style.visibility = 'hidden');
         } else {
             emptyState.style.display = 'none';
-            document.querySelectorAll('canvas').forEach(c => c.style.display = 'block');
+            document.querySelectorAll('canvas').forEach(c => c.style.visibility = 'visible');
         }
 
         renderChart('expense', 'expense', data); 
@@ -737,27 +755,19 @@
         }
     }
 
-    // === 🛠️ 导出功能优化 ===
     window.exportToExcel = function() {
         playSound('swoosh');
         if(transactions.length===0) return showToast("无数据");
         
-        // 中文映射表
         const typeMap = {
-            'expense': '支出',
-            'income': '收入',
-            'savings_in': '存入储蓄',
-            'savings_out': '取出储蓄',
-            'debt_out': '借出债权',
-            'debt_in': '收回债权'
+            'expense': '支出', 'income': '收入', 'savings_in': '存入储蓄',
+            'savings_out': '取出储蓄', 'debt_out': '借出债权', 'debt_in': '收回债权'
         };
 
         let str = "\uFEFF日期,类型,分类,备注,金额\n";
         transactions.forEach(t=> {
             let typeStr = typeMap[t.type] || t.type;
-            // 关键逻辑：如果备注为空，则导出的Excel该单元格为空，不使用分类名填充
             let noteStr = t.text ? t.text.replace(/,/g, "，") : ""; 
-            
             str+=`${t.date},${typeStr},${t.category},${noteStr},${t.amount}\n`;
         });
         
@@ -784,7 +794,7 @@
         input.value = '';
     }
 
-    // 初始化日期
+    // 初始化
     const today = new Date();
     const y = today.getFullYear();
     const m = String(today.getMonth() + 1).padStart(2, '0');
